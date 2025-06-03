@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Container, Row, Col, Accordion } from "react-bootstrap";
-import "./DetailsPage.css";
+import { Container, Row, Col, Card, Button } from "react-bootstrap";
+import "../App.css";
 
 const ApiKey = "afef81ecca186c79293fbc7be8e48057";
+const PixabayApiKey = "50060060-a0b6bfa38db8f4d3d8815a519";
 
 function PaginaDettagli() {
   const { city } = useParams();
   const [meteo, setMeteo] = useState(null);
   const [previsioni, setPrevisioni] = useState([]);
+  const [backgroundImage, setBackgroundImage] = useState("");
+  const [giornoSelezionato, setGiornoSelezionato] = useState(null);
+  const [mostraTutte, setMostraTutte] = useState(false);
 
   useEffect(() => {
     const recuperaMeteo = async () => {
@@ -26,6 +30,14 @@ function PaginaDettagli() {
       const previsioniRes = await fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${ApiKey}&units=metric&lang=it`);
       const datiPrevisioni = await previsioniRes.json();
       setPrevisioni(datiPrevisioni.list);
+
+      /* API Pixabay per immagine di sfondo */
+      const pixabayRes = await fetch(`https://pixabay.com/api/?key=${PixabayApiKey}&q=${city}&image_type=photo&orientation=horizontal`);
+      const pixabayData = await pixabayRes.json();
+      if (pixabayData.hits.length > 0) {
+        const randomIndex = Math.floor(Math.random() * pixabayData.hits.length);
+        setBackgroundImage(pixabayData.hits[randomIndex].largeImageURL);
+      }
     };
 
     recuperaMeteo();
@@ -43,13 +55,24 @@ function PaginaDettagli() {
     return acc;
   }, {});
 
+  const previsioni24Ore = previsioni.filter((item, index) => index % 2 === 0).slice(0, 12);
+
   return (
-    <Container className="contenitore-dettagli py-5">
-      <Row className="justify-content-center">
-        <Col xs={12} md={8}>
-          <div className="text-center">
-            <h1 className="mb-4">{city}</h1>
-            <p className="text-muted mb-4">
+    <div
+      style={{
+        backgroundImage: `url(${backgroundImage})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        minHeight: "100vh",
+        color: "white",
+      }}
+    >
+      <Container className="py-4">
+        <Row className="justify-content-center ">
+          {/* Colonna sinistra: Informazioni città */}
+          <Col xs={12} md={6} className="text-start BgCitta mt-3">
+            <h1 className="display-4">{city}</h1>
+            <p className="lead">
               {new Date().toLocaleDateString("it-IT", {
                 weekday: "long",
                 day: "2-digit",
@@ -57,44 +80,129 @@ function PaginaDettagli() {
                 year: "numeric",
               })}
             </p>
-            <div className="info-meteo">
-              <h2>{meteo ? `${Math.round(meteo.main.temp)}°C` : "--"}</h2>
-              <p>{meteo ? meteo.weather[0].description : "Caricamento..."}</p>
+            <h2 className="display-1">{meteo ? `${Math.round(meteo.main.temp)}°C` : "--"}</h2>
+            <div className="d-flex align-items-center">
+              {meteo && (
+                <img
+                  src={`https://openweathermap.org/img/wn/${meteo.weather[0].icon}@2x.png`}
+                  alt={meteo.weather[0].description}
+                  style={{ width: "50px", height: "50px", marginRight: "10px" }}
+                />
+              )}
+              <p className="lead">{meteo ? meteo.weather[0].description : "Caricamento..."}</p>
             </div>
-            <div className="info-vento mt-4">
-              <h5>Velocità del vento</h5>
-              <p>{meteo ? `${meteo.wind.speed} m/s` : "--"}</p>
-            </div>
-          </div>
-        </Col>
-      </Row>
-      <Row className="justify-content-center mt-5">
-        <Col xs={12}>
-          <h3 className="text-center mb-4">Previsioni per i prossimi 5 giorni</h3>
-          <Accordion>
-            {Object.keys(previsioniRaggruppate).map((giorno, index) => (
-              <Accordion.Item eventKey={index} key={index}>
-                <Accordion.Header>{giorno}</Accordion.Header>
-                <Accordion.Body>
-                  {previsioniRaggruppate[giorno].map((item, orarioIndex) => (
-                    <div key={orarioIndex} className="d-flex justify-content-between mb-2">
-                      <span>{new Date(item.dt * 1000).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}</span>
+          </Col>
+
+          {/* Colonna destra: Previsioni nelle prossime 24 ore */}
+          <Col xs={12} md={6} className="mt-3 pt-0">
+            <Card className="Prevesioni text-black satin-bg">
+              <Card.Body>
+                <h4 className="text-center">Previsioni nelle prossime 24 ore</h4>
+                <ul className="list-unstyled">
+                  {(mostraTutte ? previsioni24Ore : previsioni24Ore.slice(0, 4)).map((item, index) => (
+                    <li key={index} className="d-flex justify-content-between align-items-center mb-3">
                       <span>
-                        <strong>T:</strong> {Math.round(item.main.temp)}°C
+                        <strong>
+                          {new Date(item.dt * 1000).toLocaleTimeString("it-IT", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </strong>
                       </span>
-                      <span>
-                        <strong>Min:</strong> {Math.round(item.main.temp_min)}°C | <strong>Max:</strong> {Math.round(item.main.temp_max)}°C
-                      </span>
-                      <span>{item.weather[0].description}</span>
-                    </div>
+                      <span>{Math.round(item.main.temp)}°C</span>
+                      <img
+                        src={`https://openweathermap.org/img/wn/${item.weather[0].icon}@2x.png`}
+                        alt={item.weather[0].description}
+                        style={{ width: "40px", height: "40px" }}
+                      />
+                    </li>
                   ))}
-                </Accordion.Body>
-              </Accordion.Item>
-            ))}
-          </Accordion>
-        </Col>
-      </Row>
-    </Container>
+                </ul>
+                <Button variant="black" className="mt-3" onClick={() => setMostraTutte(!mostraTutte)}>
+                  {mostraTutte ? "Mostra meno" : "Mostra tutte"}
+                </Button>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+
+        {/* Colonna inferiore: Giorni della settimana */}
+        <Row className="mt-5">
+          <Col xs={12} md={4} className="pt-0">
+            <Card className="Prevesioni text-black satin-bg">
+              <Card.Body>
+                <h4 className="text-center">Giorni della settimana</h4>
+                <ul className="list-unstyled">
+                  {Object.keys(previsioniRaggruppate).map((giorno, index) => {
+                    return (
+                      <li
+                        key={index}
+                        className={`my-3 d-flex justify-content-between align-items-center ${giornoSelezionato === giorno ? "text-primary" : ""}`}
+                        style={{ cursor: "pointer" }}
+                        onClick={() => setGiornoSelezionato(giorno)}
+                      >
+                        <span>
+                          <strong>{giorno}</strong>
+                        </span>
+                        {previsioniRaggruppate[giorno][0]?.weather[0]?.icon && (
+                          <img
+                            src={`https://openweathermap.org/img/wn/${previsioniRaggruppate[giorno][0].weather[0].icon}@2x.png`}
+                            alt={previsioniRaggruppate[giorno][0].weather[0].description}
+                            style={{ width: "40px", height: "40px" }}
+                          />
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Card.Body>
+            </Card>
+          </Col>
+
+          {/* Colonna destra: Previsioni per il giorno selezionato */}
+          <Col xs={12} md={8} className="pt-1">
+            <Card className="Prevesioni text-black satin-bg">
+              <Card.Body>
+                <h4 className="text-center">
+                  {giornoSelezionato
+                    ? `Previsioni per ${giornoSelezionato}`
+                    : Object.keys(previsioniRaggruppate)[1]
+                    ? `Previsioni per ${Object.keys(previsioniRaggruppate)[1]}`
+                    : "Nessuna previsione disponibile"}
+                </h4>
+                <Row>
+                  {(giornoSelezionato ? previsioniRaggruppate[giornoSelezionato] : previsioniRaggruppate[Object.keys(previsioniRaggruppate)[1]])
+                    ?.slice(0, 6)
+                    .map((item, index) => (
+                      <Col xs={6} md={4} key={index} className="mb-3">
+                        <Card className="text-center bg-dark text-light">
+                          <Card.Body>
+                            <p>
+                              <strong>
+                                {new Date(item.dt * 1000).toLocaleTimeString("it-IT", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </strong>
+                            </p>
+                            <p>{Math.round(item.main.temp)}°C</p>
+                            <img
+                              src={`https://openweathermap.org/img/wn/${item.weather[0].icon}@2x.png`}
+                              alt={item.weather[0].description}
+                              style={{ width: "40px", height: "40px" }}
+                            />
+                            <p>{item.weather[0].description}</p>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                    ))}
+                </Row>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      </Container>
+    </div>
   );
 }
 
